@@ -1,0 +1,67 @@
+# in vocabulary table,
+# sections is vid 1, blog sections is vid 2, media type is vid 61
+
+TRUNCATE TABLE pantheon_wp.wp_terms;
+TRUNCATE TABLE pantheon_wp.wp_term_taxonomy;
+
+#REPLACE INTO pantheon_wp.wp_terms
+INSERT IGNORE INTO pantheon_wp.wp_terms
+(term_id, `name`, slug, term_group)
+SELECT
+d.tid, d.name, REPLACE(LOWER(d.name), ' ', '_'), d.vid
+FROM mjd6.term_data d
+INNER JOIN mjd6.term_hierarchy h
+USING(tid)
+INNER JOIN mjd6.term_node n
+USING(tid)
+WHERE (1)
+;
+
+#UPDATE pantheon_wp.wp_terms
+#  SET term_group="mj_primary_tag"
+#  WHERE term_group=5;
+#
+#UPDATE pantheon_wp.wp_terms
+#  SET term_group="mj_blog_type"
+#  WHERE term_group=2;
+#
+#UPDATE pantheon_wp.wp_terms
+#  SET term_group="mj_media_type"
+#  WHERE term_group=61;
+#
+#UPDATE pantheon_wp.wp_terms
+#  SET term_group="category"
+#  WHERE term_group=1;
+
+# in vocabulary table,
+# sections is vid 1, blog sections is vid 2, media type is vid 61, tag is 5
+INSERT IGNORE INTO pantheon_wp.wp_term_taxonomy
+(term_id, taxonomy, description, parent)
+SELECT DISTINCT
+d.tid `term_id`,
+d.vid `taxonomy`,
+d.description `description`,
+h.parent `parent`
+FROM mjd6.term_data d
+INNER JOIN mjd6.term_hierarchy h
+USING(tid)
+INNER JOIN mjd6.term_node n
+USING(tid)
+WHERE (1)
+;
+
+UPDATE pantheon_wp.wp_term_taxonomy
+  SET taxonomy="mj_primary_tag"
+  WHERE taxonomy='5';
+
+UPDATE pantheon_wp.wp_term_taxonomy
+  SET taxonomy="mj_blog_type"
+  WHERE taxonomy='2';
+
+UPDATE pantheon_wp.wp_term_taxonomy
+  SET taxonomy="mj_media_type"
+  WHERE taxonomy='61';
+
+UPDATE pantheon_wp.wp_term_taxonomy
+  SET taxonomy="category"
+  WHERE taxonomy='1';

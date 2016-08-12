@@ -1,0 +1,90 @@
+
+DELETE FROM pantheon_wp.wp_users WHERE ID > 1;
+DELETE FROM pantheon_wp.wp_usermeta WHERE user_id > 1;
+
+INSERT IGNORE INTO pantheon_wp.wp_users
+(ID, user_login, user_pass, user_nicename, user_email,
+user_registered, user_activation_key, user_status, display_name)
+SELECT DISTINCT
+u.uid, u.mail, NULL, u.name, u.mail,
+FROM_UNIXTIME(created), '', 0, u.name
+FROM mjd6.users u
+INNER JOIN mjd6.users_roles r
+USING (uid)
+;
+
+INSERT IGNORE INTO pantheon_wp.wp_usermeta (user_id, meta_key, meta_value)
+SELECT DISTINCT
+u.uid, 'wp_capabilities', 'a:1:{s:6:"author";s:1:"1";}'
+FROM mjd6.users u
+INNER JOIN mjd6.users_roles r
+USING (uid)
+WHERE (1
+# Uncomment and enter any email addresses you want to exclude below.
+AND u.mail NOT IN ('bbreedlove@motherjones.com')
+)
+;
+
+#INSERT IGNORE INTO pantheon_wp.wp_usermeta (user_id, meta_key, meta_value)
+#SELECT DISTINCT
+#u.uid, 'wp_user_level', '2'
+#FROM mjd6.users u
+#INNER JOIN mjd6.users_roles r
+#USING (uid)
+#WHERE (1
+## Uncomment and enter any email addresses you want to exclude below.
+## AND u.mail NOT IN ('test@example.com')
+#)
+#;
+
+UPDATE pantheon_wp.wp_usermeta
+SET meta_value = 'a:1:{s:13:"administrator";s:1:"1";}'
+WHERE user_id IN (1) AND meta_key = 'wp_capabilities'
+;
+UPDATE pantheon_wp.wp_usermeta
+SET meta_value = '10'
+WHERE user_id IN (1) AND meta_key = 'wp_user_level'
+;
+
+UPDATE pantheon_wp.wp_posts
+SET post_author = NULL
+WHERE post_author NOT IN (SELECT DISTINCT ID FROM pantheon_wp.wp_users)
+;
+
+
+
+UPDATE pantheon_wp.wp_usermeta
+SET meta_value = '10'
+WHERE user_id IN (1) AND meta_key = 'wp_user_level'
+;
+
+INSERT IGNORE INTO pantheon_wp.wp_usermeta (user_id, meta_key, meta_value)
+SELECT u.uid, 'twitter', a.field_twitter_user_value
+FROM mjd6.users u INNER JOIN mjd6.content_type_author a 
+ON u.uid=a.field_user_uid;
+
+
+INSERT IGNORE INTO pantheon_wp.wp_usermeta (user_id, meta_key, meta_value)
+SELECT u.uid, 'last_name', a.field_last_name_value
+FROM mjd6.users u INNER JOIN mjd6.content_type_author a 
+ON u.uid=a.field_user_uid;
+
+INSERT IGNORE INTO pantheon_wp.wp_usermeta (user_id, meta_key, meta_value)
+SELECT u.uid, 'long_bio', a.field_author_bio_value
+FROM mjd6.users u INNER JOIN mjd6.content_type_author a 
+ON u.uid=a.field_user_uid;
+
+INSERT IGNORE INTO pantheon_wp.wp_usermeta (user_id, meta_key, meta_value)
+SELECT u.uid, 'position', a.field_author_title_value
+FROM mjd6.users u INNER JOIN mjd6.content_type_author a 
+ON u.uid=a.field_user_uid;
+
+INSERT IGNORE INTO pantheon_wp.wp_usermeta (user_id, meta_key, meta_value)
+SELECT u.uid, 'short_bio', a.field_author_bio_short_value
+FROM mjd6.users u INNER JOIN mjd6.content_type_author a 
+ON u.uid=a.field_user_uid;
+
+INSERT IGNORE INTO pantheon_wp.wp_usermeta (user_id, meta_key, meta_value)
+SELECT u.uid, 'nickname', u.name
+FROM mjd6.users u 
+;

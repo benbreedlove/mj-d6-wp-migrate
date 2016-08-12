@@ -1,0 +1,223 @@
+TRUNCATE pantheon_wp.wp_posts;
+TRUNCATE pantheon_wp.wp_postmeta;
+TRUNCATE pantheon_wp.wp_term_relationships;
+
+INSERT IGNORE INTO pantheon_wp.wp_posts
+(ID, post_author, post_date, post_date_gmt, post_content, post_title, post_excerpt,
+post_name, to_ping, pinged, post_modified, post_modified_gmt,
+post_content_filtered, post_type, `post_status`)
+SELECT DISTINCT
+n.nid `ID`,
+n.uid `post_author`,
+FROM_UNIXTIME(n.created) `post_date`,
+FROM_UNIXTIME(n.created) `post_date_gmt`,
+r.body `post_content`,
+n.title `post_title`,
+r.teaser `post_excerpt`,
+IF( 
+	LOCATE('/', a.dst),
+	SUBSTR(a.dst, 
+		CHAR_LENGTH(a.dst) - LOCATE('/', REVERSE(a.dst)) + 2 
+	),
+	a.dst
+) `post_name`,
+'' `to_ping`,
+'' `pinged`,
+FROM_UNIXTIME(n.changed) `post_modified`,
+FROM_UNIXTIME(n.changed) `post_modified_gmt`,
+'' `post_content_filtered`,
+n.type `post_type`,
+IF(n.status = 1, 'publish', 'private') `post_status`
+FROM mjd6.node n
+INNER JOIN mjd6.node_revisions r
+USING(vid)
+LEFT OUTER JOIN mjd6.url_alias a
+ON a.src = CONCAT('node/', n.nid)
+# Add more Drupal content types below if applicable.
+WHERE n.type IN ('article', 'blogpost', 'page', 'full_width_article')
+;
+
+UPDATE pantheon_wp.wp_posts
+  SET post_type="mj_article"
+  WHERE post_type="article";
+
+UPDATE pantheon_wp.wp_posts
+  SET post_type="mj_full_width"
+  WHERE post_type="full_width_article";
+
+UPDATE pantheon_wp.wp_posts
+  SET post_type="mj_blog_post"
+  WHERE post_type="blogpost";
+
+# assign tags to articles
+INSERT IGNORE INTO pantheon_wp.wp_term_relationships (object_id, term_taxonomy_id)
+SELECT DISTINCT nid, tid FROM mjd6.term_node
+;
+# Update tag counts.
+UPDATE pantheon_wp.wp_term_taxonomy tt
+SET `count` = (
+SELECT COUNT(tr.object_id)
+FROM pantheon_wp.wp_term_relationships tr
+WHERE tr.term_taxonomy_id = tt.term_taxonomy_id
+)
+;
+
+#assign authors (by tags) to articles
+INSERT IGNORE INTO pantheon_wp.wp_term_relationships (object_id, term_taxonomy_id)
+SELECT DISTINCT n.nid, u.uid 
+FROM mjd6.term_node n
+INNER JOIN mjd6.content_field_byline b
+ON n.nid = b.nid
+INNER JOIN mjd6.content_type_author a
+ON b.field_byline_nid=a.nid
+INNER JOIN mjd6.users u
+ON a.field_user_uid=u.uid
+;
+
+INSERT INTO pantheon_wp.wp_term_relationships (object_id, term_taxonomy_id)
+SELECT DISTINCT nid, tid FROM mjd6.term_node
+;
+# Update tag counts.
+UPDATE pantheon_wp.wp_term_taxonomy tt
+SET `count` = (
+SELECT COUNT(tr.object_id)
+FROM wp_term_relationships tr
+WHERE tr.term_taxonomy_id = tt.term_taxonomy_id
+)
+;
+
+#for blog body
+INSERT IGNORE INTO pantheon_wp.wp_postmeta (post_id, meta_key, meta_value)
+SELECT n.nid, "body", CONCAT(b.field_short_body_value, e.field_extended_body_value)
+FROM mjd6.node n
+INNER JOIN mjd6.content_field_short_body b
+USING(vid)
+INNER JOIN mjd6.content_type_blogpost e
+USING(vid)
+WHERE n.type="blogpost"
+;
+
+#for article body
+INSERT IGNORE INTO pantheon_wp.wp_postmeta (post_id, meta_key, meta_value)
+SELECT n.nid, "body", CONCAT(b.field_short_body_value, e.field_article_text_value)
+FROM mjd6.node n
+INNER JOIN mjd6.content_field_short_body b
+USING(vid)
+INNER JOIN mjd6.content_field_article_text e
+USING(vid)
+WHERE n.type="article"
+;
+
+#for fullwidth body
+INSERT IGNORE INTO pantheon_wp.wp_postmeta (post_id, meta_key, meta_value)
+SELECT n.nid, "body", b.field_short_body_value
+FROM mjd6.node n
+INNER JOIN mjd6.content_field_short_body b
+USING(vid)
+WHERE n.type="full_width_article"
+;
+
+#for dek
+INSERT IGNORE INTO pantheon_wp.wp_postmeta (post_id, meta_key, meta_value)
+SELECT n.nid, "dek", d.field_dek_value
+FROM mjd6.node n
+INNER JOIN mjd6.content_field_dek d
+USING(vid)
+;
+
+#for social
+INSERT IGNORE INTO pantheon_wp.wp_postmeta (post_id, meta_key, meta_value)
+SELECT n.nid, "social", CONCAT('a:4:{s:12:"social_title";s:20:"', 
+t.field_social_title_value,
+'";s:10:"social_dek";s:25:"',
+d.field_social_dek_value,
+'";s:8:"standout";b:0;s:18:"fb_instant_exclude";b:0;}')
+FROM mjd6.node n
+INNER JOIN mjd6.content_field_social_dek d
+USING(vid)
+INNER JOIN mjd6.content_field_social_title t
+USING(vid)
+;
+
+#for alt
+INSERT IGNORE INTO pantheon_wp.wp_postmeta (post_id, meta_key, meta_value)
+SELECT n.nid, "alt", CONCAT('a:2:{s:9:"alt_title";s:',
+CHAR_LENGTH(t.field_alternate_title_value),
+':"',
+t.field_alternate_title_value,
+'";s:7:"alt_dek";s:',
+CHAR_LENGTH(d.field_alternate_dek_value),
+':"',
+d.field_alternate_dek_value,
+'";}'
+)
+FROM mjd6.node n
+INNER JOIN mjd6.content_field_alternate_dek d
+USING(vid)
+INNER JOIN mjd6.content_field_alternate_title t
+USING(vid)
+;
+
+#for css, js
+INSERT IGNORE INTO pantheon_wp.wp_postmeta (post_id, meta_key, meta_value)
+SELECT n.nid, "css_js", CONCAT(
+'a:2:{s:3:"css";s:',
+CHAR_LENGTH(c.field_css_value),
+':"',
+c.field_css_value,
+'";s:2:"js";s:',
+CHAR_LENGTH(j.field_javascript_value),
+':"',
+j.field_javascript_value,
+'";}'
+)
+FROM mjd6.node n
+INNER JOIN mjd6.content_field_css c
+USING(vid)
+INNER JOIN mjd6.content_field_javascript j
+USING(vid)
+;
+
+# for dateline override
+INSERT IGNORE INTO pantheon_wp.wp_postmeta (post_id, meta_key, meta_value)
+SELECT n.nid, "dateline_override", d.field_issue_date_value
+FROM mjd6.node n
+INNER JOIN mjd6.content_field_issue_date d
+USING(vid)
+WHERE d.field_issue_date_value!='NULL'
+;
+
+
+#okay real syntax is a: length{ i: (incrementor, 0 ++); i:post id; }
+INSERT IGNORE INTO pantheon_wp.wp_postmeta (post_id, meta_key, meta_value)
+SELECT n.nid, 'related_articles',
+CONCAT(
+'a:1:{s:8:"relateds";a:1:{',
+  'i:',
+  GROUP_CONCAT(
+    DISTINCT r.field_related_articles_nid 
+    SEPARATOR ';i:'
+  ),
+  ';',
+'}}'
+)
+FROM mjd6.node n
+INNER JOIN mjd6.content_field_related_articles r
+USING(vid)
+GROUP BY n.nid
+;
+
+UPDATE pantheon_wp.wp_posts
+SET post_author = NULL
+WHERE post_author NOT IN (SELECT DISTINCT ID FROM pantheon_wp.wp_users)
+;
+
+
+#to put into posts: full_width_title_image, master_image,
+# file_attachments: need to pull one in to see structure
+# byline override: need to remove author selection turn into a single field
+
+
+#byline field_byline_nid says 64597, node uid is 53682 :(
+# okay field byline nid points to content_type_author, 
+# which in turn points back to user with field_user_uid
