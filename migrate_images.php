@@ -1,4 +1,8 @@
 <?php
+
+
+
+
 $hostname="localhost";  
 $username="root";   
 $password="p";  
@@ -8,9 +12,9 @@ $d6 = new PDO("mysql:host=$hostname;dbname=$d6_db", $username, $password);
 
 $wp_db = "pantheon_wp";  
 $wp = new PDO("mysql:host=$hostname;dbname=$wp_db", $username, $password);  
+$wp->setAttribute( PDO::ATTR_ERRMODE, PDO::ERRMODE_WARNING );
 
-$wp_2 = new PDO("mysql:host=$hostname;dbname=$wp_db", $username, $password);  
-
+//FIXME REPEAT FOR FULL WIDTH TITLES< content_field_top_of_content_image 
 //for master images
 $master_data = $d6->prepare('
 SELECT DISTINCT 
@@ -22,7 +26,9 @@ n.status,
 i.field_master_image_data,
 c.field_master_image_caption_value,
 b.field_art_byline_value,
-s.field_suppress_master_image_value
+s.field_suppress_master_image_value,
+f.filemime,
+f.filename
 FROM mjd6.node n
 INNER JOIN mjd6.content_field_master_image i
 USING(vid)
@@ -32,6 +38,8 @@ INNER JOIN mjd6.content_field_art_byline b
 USING(vid)
 INNER JOIN mjd6.content_field_suppress_master_image s
 USING(vid)
+INNER JOIN mjd6.files f
+ON(i.field_master_image_fid = f.fid)
 ;
 ');
 $master_data->execute();
@@ -42,60 +50,81 @@ INSERT IGNORE INTO pantheon_wp.wp_posts
 post_name, to_ping, pinged, post_modified, post_modified_gmt,
 post_content_filtered, post_type, `post_status`, post_mime_type)
 VALUES (
-:post_author `post_author`,
-FROM_UNIXTIME(:post_date) `post_date`,
-FROM_UNIXTIME(:post_date) `post_date_gmt`,
-"" `post_content`,
-:post_title `post_title`,
-"" `post_excerpt`,
-:post_title `post_name`,
-"" `to_ping`,
-"" `pinged`,
-FROM_UNIXTIME(:post_modified) `post_modified`,
-FROM_UNIXTIME(:post_modified) `post_modified_gmt`,
-"" `post_content_filtered`,
-"attachment" `post_type`,
-IF(:status = 1, "publish", "private") `post_status`,
-:post_mime_type `post_mime_type`
+:post_author,
+FROM_UNIXTIME(:post_date),
+FROM_UNIXTIME(:post_date),
+"",
+:post_title,
+"",
+:post_name,
+"",
+"",
+FROM_UNIXTIME(:post_modified),
+FROM_UNIXTIME(:post_modified),
+"",
+"attachment",
+IF(:status = 1, "publish", "private"),
+:post_mime_type
 )
 ;
 ');
 
-$master_meta_insert = $wp_2->prepare('
-INSERT IGNORE INTO pantheon_wp.wp_postmeta
-VALUES (:post_id, "master_image", :meta_value)
-;
-');
+$master_meta_rows = array();
+
 $wp->beginTransaction();
-$wp_2->beginTransaction();
 while ( $master = $master_data->fetch(PDO::FETCH_ASSOC)) {
+  if (!$master['field_master_image_data']) { continue; }
+
   $master_data_array = unserialize($master['field_master_image_data']);
-  $mime_type = "image/" . preg_replace(
-    '^.*\.',
-    '',
-    $master_data_array['title']
-  );
+
+  $post_name = preg_replace("/\.[^.]+$/", "", $master['filename'] );
+  $post_title = $master_data_array['title'] 
+    ? $master_data_array['title']
+    : $post_name
+  ;
+
 
   $master_insert->execute(array(
     ':post_author' => $master['uid'],
     ':post_date' => $master['created'],
     ':post_title' => $master_data_array['title'],
+    ':post_name' => $post_name,
     ':post_modified' => $master['changed'],
     ':status' => $master['status'],
-    ':post_mime_type' =>$mime_type
+    ':post_mime_type' => $master['filemime'],
   ) );
+
 
   $master_meta_value = serialize( array(
     'master_image' => $wp->lastInsertId(),
     'master_image_byline' => $master['field_art_byline_value'],
-    'master_image_caption' => $master['content_field_master_image_caption'],
+    'master_image_caption' => $master['field_master_image_caption_value'],
     'master_image_suppress' => $master['field_suppress_master_image_value']
   ) );
+
+  $master_meta_rows[] = array(
+    'nid' => $master['nid'],
+    'value' => $master_meta_value
+  );
+}
+$wp->commit();
+
+
+
+$master_meta_insert = $wp->prepare("
+INSERT IGNORE INTO pantheon_wp.wp_postmeta
+(post_id, meta_key, meta_value)
+VALUES (?, ?, ?)
+;
+");
+$wp->beginTransaction();
+foreach ( $master_meta_rows as $row ) {
   $master_meta_insert->execute(array(
-    ':post_id' => $master['nid'],
-    ':meta_value' => $master_meta_value
+    $row['nid'],
+    'master_image',
+    $row['value']
   ) );
 }
 $wp->commit();
-$wp_2->commit();
+
 ?>

@@ -94,7 +94,12 @@ $wp->commit();
 //for blog body
 $meta_data = $d6->prepare("
 SELECT DISTINCT 
-n.nid, 'body', CONCAT(b.field_short_body_value, e.field_extended_body_value)
+n.nid, 'body',
+IF( 
+  e.field_extended_body_value = IS NULL,
+  b.field_short_body_value,
+  CONCAT(b.field_short_body_value, e.field_extended_body_value)
+)
 FROM mjd6.node n
 INNER JOIN mjd6.content_field_short_body b
 USING(vid)
@@ -114,15 +119,18 @@ VALUES (?, ?, ?)
 $wp->beginTransaction();
 while ( $meta = $meta_data->fetch(PDO::FETCH_NUM)) {
 	$meta_insert->execute($meta);
-      print_r("\n made blogpost body");
-      print_r($wp->lastInsertId());
 }
 $wp->commit();
 
 //for article bodys
 $meta_data = $d6->prepare('
 SELECT DISTINCT 
-n.nid, "body", CONCAT(b.field_short_body_value, e.field_article_text_value)
+n.nid, "body", 
+IF( 
+  e.field_article_text_value IS NULL,
+  b.field_short_body_value,
+  CONCAT(b.field_short_body_value, e.field_article_text_value)
+)
 FROM mjd6.node n
 INNER JOIN mjd6.content_field_short_body b
 USING(vid)
@@ -136,8 +144,6 @@ $meta_data->execute();
 $wp->beginTransaction();
 while ( $meta = $meta_data->fetch(PDO::FETCH_NUM)) {
 	$meta_insert->execute($meta);
-      print_r("\n made article body");
-      print_r($wp->lastInsertId());
 }
 $wp->commit();
 
@@ -157,8 +163,6 @@ $meta_data->execute();
 $wp->beginTransaction();
 while ( $meta = $meta_data->fetch(PDO::FETCH_NUM)) {
 	$meta_insert->execute($meta);
-      print_r("\n made fullwidth body");
-      print_r($wp->lastInsertId());
 }
 $wp->commit();
 
@@ -185,7 +189,7 @@ SELECT DISTINCT n.nid, "dateline_override", d.field_issue_date_value
 FROM mjd6.node n
 INNER JOIN mjd6.content_field_issue_date d
 USING(vid)
-WHERE d.field_issue_date_value!="NULL"
+WHERE d.field_issue_date_value IS NOT NULL
 ;
 ');
 $meta_data->execute();
@@ -202,7 +206,7 @@ SELECT DISTINCT n.nid, "byline_override", b.field_issue_date_value
 FROM mjd6.node n
 INNER JOIN mjd6.field_byline_override_value b
 USING(vid)
-WHERE d.field_byline_override_value!="NULL"
+WHERE d.field_byline_override_value IS NOT NULL
 ;
 ');
 $meta_data->execute();
@@ -284,7 +288,7 @@ $wp->beginTransaction();
 while ( $meta = $meta_data->fetch(PDO::FETCH_ASSOC)) {
   $cssjs_value = serialize( array(
     'css' => $meta['field_css_value'],
-    'js' => $meta['field_js_value'],
+    'js' => $meta['field_javascript_value'],
   ) );
 	$meta_insert->execute(array($meta['nid'], 'css_js', $cssjs_value) );
 }
@@ -306,13 +310,14 @@ $meta_data->execute();
 
 $wp->beginTransaction();
 while ( $meta = $meta_data->fetch(PDO::FETCH_ASSOC)) {
-  $cssjs_value = serialize( array(
-    'relateds' => split(',', $meta['relateds'])
+  $related_value = serialize( array(
+    'relateds' => explode(',', $meta['relateds'])
   ) );
-	$meta_insert->execute(array($meta['nid'], 'css_js', $cssjs_value) );
+  
+	$meta_insert->execute(array($meta['nid'], 'related_articles', $related_value) );
 }
 $wp->commit();
 ?>
 FIXME
-#to put into posts: full_width_title_image, master_image,
+#to put into posts: full_width_title_image
 # file_attachments: need to pull one in to see structure
