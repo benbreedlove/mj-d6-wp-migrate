@@ -14,7 +14,6 @@ $wp->beginTransaction();
 $wp->exec('
 TRUNCATE pantheon_wp.wp_posts;
 TRUNCATE pantheon_wp.wp_postmeta;
-TRUNCATE pantheon_wp.wp_term_relationships;
 ');
 $wp->commit();
 

@@ -14,6 +14,7 @@ $wp->beginTransaction();
 $wp->exec('
 TRUNCATE TABLE wp_terms;
 TRUNCATE TABLE wp_term_taxonomy;
+TRUNCATE pantheon_wp.wp_term_relationships;
 ');
 $wp->commit();
 
@@ -108,6 +109,11 @@ INSERT IGNORE INTO pantheon_wp.wp_term_relationships
 VALUES (?, ?)
 ');
 
+$wp->beginTransaction();
+while ( $term = $term_rel_data->fetch(PDO::FETCH_NUM)) {
+	$term_rel_insert->execute($term);
+}
+$wp->commit();
 
 // Update tag counts.
 $wp->beginTransaction();
