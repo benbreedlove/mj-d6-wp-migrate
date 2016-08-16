@@ -1,7 +1,5 @@
 <?php
-
-
-
+$FILEDIR = "https://www.motherjones.com/files/";
 
 $hostname="localhost";  
 $username="root";   
@@ -47,8 +45,8 @@ $master_data->execute();
 $master_insert = $wp->prepare('
 INSERT IGNORE INTO pantheon_wp.wp_posts
 (post_author, post_date, post_date_gmt, post_content, post_title, post_excerpt,
-post_name, to_ping, pinged, post_modified, post_modified_gmt,
-post_content_filtered, post_type, `post_status`, post_mime_type)
+post_name, to_ping, pinged, post_modified, post_modified_gmt, guid,
+post_content_filtered, post_type, `post_status`, post_parent, post_mime_type)
 VALUES (
 :post_author,
 FROM_UNIXTIME(:post_date),
@@ -61,9 +59,11 @@ FROM_UNIXTIME(:post_date),
 "",
 FROM_UNIXTIME(:post_modified),
 FROM_UNIXTIME(:post_modified),
+:guid,
 "",
 "attachment",
 IF(:status = 1, "publish", "private"),
+:post_parent,
 :post_mime_type
 )
 ;
@@ -77,6 +77,7 @@ while ( $master = $master_data->fetch(PDO::FETCH_ASSOC)) {
 
   $master_data_array = unserialize($master['field_master_image_data']);
 
+  $guid = $FILEDIR . $master['filename'];
   $post_name = preg_replace("/\.[^.]+$/", "", $master['filename'] );
   $post_title = $master_data_array['title'] 
     ? $master_data_array['title']
@@ -90,7 +91,9 @@ while ( $master = $master_data->fetch(PDO::FETCH_ASSOC)) {
     ':post_title' => $master_data_array['title'],
     ':post_name' => $post_name,
     ':post_modified' => $master['changed'],
+    ':guid' => $guid,
     ':status' => $master['status'],
+    ':post_parent' => $master['nid'],
     ':post_mime_type' => $master['filemime'],
   ) );
 
