@@ -83,7 +83,7 @@ UPDATE pantheon_wp.wp_posts
   WHERE post_type="blogpost";
 
 UPDATE pantheon_wp.wp_posts
-  SET post_author = NULL
+  SET post_author IS NULL
   WHERE post_author NOT IN (SELECT DISTINCT ID FROM pantheon_wp.wp_users) ;
 
 ');
@@ -95,7 +95,7 @@ $meta_data = $d6->prepare("
 SELECT DISTINCT 
 n.nid, 'body',
 IF( 
-  e.field_extended_body_value = IS NULL,
+  e.field_extended_body_value IS NULL,
   b.field_short_body_value,
   CONCAT(b.field_short_body_value, e.field_extended_body_value)
 )
