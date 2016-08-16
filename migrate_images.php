@@ -88,7 +88,7 @@ while ( $master = $master_data->fetch(PDO::FETCH_ASSOC)) {
   $master_insert->execute(array(
     ':post_author' => $master['uid'],
     ':post_date' => $master['created'],
-    ':post_title' => $master_data_array['title'],
+    ':post_title' => $post_title,
     ':post_name' => $post_name,
     ':post_modified' => $master['changed'],
     ':guid' => $guid,
@@ -130,4 +130,109 @@ foreach ( $master_meta_rows as $row ) {
 }
 $wp->commit();
 
+//TITLE IMAGES HERE
+$title_data = $d6->prepare('
+SELECT DISTINCT 
+n.nid,
+n.uid,
+n.created,
+n.changed,
+n.status,
+i.field_title_image_data,
+i.field_title_image_credit_value,
+f.filemime,
+f.filename
+FROM mjd6.node n
+INNER JOIN mjd6.content_type_full_width_article i
+USING(vid)
+INNER JOIN mjd6.files f
+ON(i.field_title_image_fid = f.fid)
+;
+');
+$title_data->execute();
+
+$title_insert = $wp->prepare('
+INSERT IGNORE INTO pantheon_wp.wp_posts
+(post_author, post_date, post_date_gmt, post_content, post_title, post_excerpt,
+post_name, to_ping, pinged, post_modified, post_modified_gmt, guid,
+post_content_filtered, post_type, `post_status`, post_parent, post_mime_type)
+VALUES (
+:post_author,
+FROM_UNIXTIME(:post_date),
+FROM_UNIXTIME(:post_date),
+"",
+:post_title,
+"",
+:post_name,
+"",
+"",
+FROM_UNIXTIME(:post_modified),
+FROM_UNIXTIME(:post_modified),
+:guid,
+"",
+"attachment",
+IF(:status = 1, "publish", "private"),
+:post_parent,
+:post_mime_type
+)
+;
+');
+
+$title_meta_rows = array();
+
+$wp->beginTransaction();
+while ( $title = $title_data->fetch(PDO::FETCH_ASSOC)) {
+  if (!$title['field_title_image_data']) { continue; }
+
+  $title_data_array = unserialize($title['field_title_image_data']);
+
+  $guid = $FILEDIR . $title['filename'];
+  $post_name = preg_replace("/\.[^.]+$/", "", $title['filename'] );
+  $post_title = $title_data_array['title'] 
+    ? $title_data_array['title']
+    : $post_name
+  ;
+
+
+  $title_insert->execute(array(
+    ':post_author' => $title['uid'],
+    ':post_date' => $title['created'],
+    ':post_title' => $post_title,
+    ':post_name' => $post_name,
+    ':post_modified' => $title['changed'],
+    ':guid' => $guid,
+    ':status' => $title['status'],
+    ':post_parent' => $title['nid'],
+    ':post_mime_type' => $title['filemime'],
+  ) );
+
+
+  $title_meta_value = serialize( array(
+    'title_image' => $wp->lastInsertId(),
+    'title_image_credit' => $title['field_title_image_credit_value'],
+  ) );
+
+  $title_meta_rows[] = array(
+    'nid' => $title['nid'],
+    'value' => $title_meta_value
+  );
+}
+$wp->commit();
+
+
+$title_meta_insert = $wp->prepare("
+INSERT IGNORE INTO pantheon_wp.wp_postmeta
+(post_id, meta_key, meta_value)
+VALUES (?, ?, ?)
+;
+");
+$wp->beginTransaction();
+foreach ( $title_meta_rows as $row ) {
+  $title_meta_insert->execute(array(
+    $row['nid'],
+    'title_image',
+    $row['value']
+  ) );
+}
+$wp->commit();
 ?>
