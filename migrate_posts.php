@@ -318,5 +318,4 @@ while ( $meta = $meta_data->fetch(PDO::FETCH_ASSOC)) {
 $wp->commit();
 ?>
 FIXME
-#to put into posts: full_width_title_image
 # file_attachments: need to pull one in to see structure

@@ -74,12 +74,13 @@ VALUES (
 $tax_insert->bindParam(1, $tid);
 $tax_insert->bindParam(2, $tax);
 
+$term_to_tax_term = [];
 $wp->beginTransaction();
 while ( $row = $taxonomy_data->fetch(PDO::FETCH_ASSOC)) {
 	$tid = $row['term_id'];
 	$tax = $row['taxonomy'];
 	switch ($tax) {
-		case "5":
+		case "9":
 			$tax = "mj_primary_tag";
 			break;
 		case "2":
@@ -93,6 +94,7 @@ while ( $row = $taxonomy_data->fetch(PDO::FETCH_ASSOC)) {
 			break;
 	}
 	$tax_insert->execute();
+  $term_to_tax_term[$row['term_id']] = $wp->lastInsertId();
 }
 $wp->commit();
 
@@ -111,6 +113,7 @@ VALUES (?, ?)
 
 $wp->beginTransaction();
 while ( $term = $term_rel_data->fetch(PDO::FETCH_NUM)) {
+  $term[1] = $term_to_tax_term[$term[1]];
 	$term_rel_insert->execute($term);
 }
 $wp->commit();

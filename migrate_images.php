@@ -1,5 +1,5 @@
 <?php
-$FILEDIR = "https://www.motherjones.com/files/";
+$FILEDIR = "http://dev-mjben.pantheonsite.io/wp-content/uploads/";
 
 $hostname="localhost";  
 $username="root";   
@@ -107,7 +107,9 @@ while ( $master = $master_data->fetch(PDO::FETCH_ASSOC)) {
 
   $master_meta_rows[] = array(
     'nid' => $master['nid'],
-    'value' => $master_meta_value
+    'image_id' => $wp->lastInsertId(),
+    'value' => $master_meta_value,
+    'filename' => $master['filename']
   );
 }
 $wp->commit();
@@ -126,6 +128,14 @@ foreach ( $master_meta_rows as $row ) {
     $row['nid'],
     'master_image',
     $row['value']
+  ) );
+
+//FIXME ADD _wp_attached_file to posts_metadata w/ a key of something like
+//  2016/06/24m6dk0.jpg
+  $master_meta_insert->execute(array(
+    $row['image_id'],
+    '_wp_attached_file',
+    $row['filename']
   ) );
 }
 $wp->commit();
@@ -214,7 +224,9 @@ while ( $title = $title_data->fetch(PDO::FETCH_ASSOC)) {
 
   $title_meta_rows[] = array(
     'nid' => $title['nid'],
-    'value' => $title_meta_value
+    'image_id' => $wp->lastInsertId(),
+    'value' => $title_meta_value,
+    'filename' => $master['filename']
   );
 }
 $wp->commit();
@@ -232,6 +244,12 @@ foreach ( $title_meta_rows as $row ) {
     $row['nid'],
     'title_image',
     $row['value']
+  ) );
+
+  $title_meta_insert->execute(array(
+    $row['image_id'],
+    '_wp_attached_file',
+    $row['filename']
   ) );
 }
 $wp->commit();

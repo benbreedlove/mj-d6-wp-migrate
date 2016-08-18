@@ -35,7 +35,7 @@ VALUES (
 ?,
 ?,
 ?,
-?,
+REPLACE(LOWER(?), " ", "-"),
 ?,
 ?,
 ?,
@@ -92,16 +92,25 @@ $wp->commit();
 
 
 $author_meta_data = $d6->prepare("
-SELECT DISTINCT 
-u.uid, 
+SELECT DISTINCT
+n.nid,
+u.uid,
+a.field_user_uid, 
 a.field_twitter_user_value,
 a.field_last_name_value,
 a.field_author_bio_short_value,
 a.field_author_title_value,
 a.field_author_bio_value,
 u.name
-FROM mjd6.users u INNER JOIN mjd6.content_type_author a 
-ON u.uid=a.field_user_uid;
+FROM mjd6.node n
+INNER JOIN mjd6.node_revisions r
+USING(vid)
+LEFT OUTER JOIN mjd6.content_type_author a 
+USING(vid)
+LEFT OUTER JOIN mjd6.users u
+ON u.uid=a.field_user_uid
+WHERE name IS NOT NULL
+;
 ");
 $author_meta_data->execute();
 
